@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Webcam Object Detector</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:16px; }
+  h1 { font-size:22px; margin:0 0 8px; }
+  #status { margin:8px 0; color:#ffd54a; }
+  .controls { display:flex; flex-wrap:wrap; gap:16px; margin:12px 0; align-items:center; }
+  select, button { font-size:16px; padding:6px 10px; }
+  #stage { position:relative; max-width:900px; background:#000; }
+  video, canvas { width:100%; display:block; }
+  canvas { position:absolute; left:0; top:0; }
+  .stats { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; }
+  .card { background:#222; border-radius:8px; padding:10px 16px; min-width:170px; }
+  .card b { display:block; font-size:30px; color:#4cff7a; }
+  .card span { font-size:13px; color:#aaa; }
+  #list { margin-top:10px; color:#ccc; }
+</style>
+</head>
+<body>
+<h1>Webcam Object Detector</h1>
+<div id="status">Loading the detector… please wait (needs internet the first time).</div>
+
+<div class="controls">
+  <label>Show objects as:
+    <select id="style">
+      <option value="box">A. Green box</option>
+      <option value="dot">B. Red dot</option>
+    </select>
+  </label>
+  <label>Area to measure density:
+    <select id="area">
+      <option value="whole">Whole picture</option>
+      <option value="left">Left half</option>
+      <option value="right">Right half</option>
+      <option value="top">Top half</option>
+      <option value="bottom">Bottom half</option>
+      <option value="center">Centre</option>
+    </select>
+  </label>
+</div>
+
+<div id="stage">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="stats">
+  <div class="card"><b id="total">0</b><span>Objects detected (whole picture)</span></div>
+  <div class="card"><b id="inArea">0</b><span>Objects inside chosen area</span></div>
+  <div class="card"><b id="density">0.00</b><span>Density: objects per 100×100 pixel block (chosen area)</span></div>
+  <div class="card"><b id="cover">0%</b><span>Share of chosen area covered by objects</span></div>
+</div>
+<div id="list"></div>
+
+<!-- Everything runs in your browser. Libraries are loaded once from the internet. -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const $ = id => document.getElementById(id);
+
+function areaRect(kind, w, h) {
+  switch (kind) {
+    case 'left':   return {x:0, y:0, w:w/2, h:h};
+    case 'right':  return {x:w/2, y:0, w:w/2, h:h};
+    case 'top':    return {x:0, y:0, w:w, h:h/2};
+    case 'bottom': return {x:0, y:h/2, w:w, h:h/2};
+    case 'center': return {x:w/4, y:h/4, w:w/2, h:h/2};
+    default:       return {x:0, y:0, w:w, h:h};
+  }
+}
+
+function overlap(b, r) {
+  const x1 = Math.max(b[0], r.x), y1 = Math.max(b[1], r.y);
+  const x2 = Math.min(b[0]+b[2], r.x+r.w), y2 = Math.min(b[1]+b[3], r.y+r.h);
+  return Math.max(0, x2-x1) * Math.max(0, y2-y1);
+}
+
+async function start() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    await new Promise(r => video.onloadedmetadata = r);
+    await video.play();
+  } catch (e) {
+    statusEl.textContent = 'Could not open the camera. Please click "Allow" when the browser asks for camera access, then refresh this page.';
+    return;
+  }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  let model;
+  try {
+    model = await cocoSsd.load();
+  } catch (e) {
+    statusEl.textContent = 'Could not load the detector. Please check your internet connection and refresh.';
+    return;
+  }
+  statusEl.textContent = 'Running. Detection is live.';
+  loop(model);
+}
+
+async function loop(model) {
+  const preds = (await model.detect(video, 50)).filter(p => p.score > 0.5);
+  const W = canvas.width, H = canvas.height;
+  const style = $('style').value;
+  const rect = areaRect($('area').value, W, H);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw the chosen area as a dashed blue outline
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = '#4aa8ff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.setLineDash([]);
+
+  let inArea = 0, covered = 0;
+  const counts = {};
+  for (const p of preds) {
+    const [x, y, w, h] = p.bbox;
+    counts[p.class] = (counts[p.class] || 0) + 1;
+    const cx = x + w/2, cy = y + h/2;
+    if (cx >= rect.x && cx <= rect.x+rect.w && cy >= rect.y && cy <= rect.y+rect.h) inArea++;
+    covered += overlap(p.bbox, rect);
+
+    if (style === 'box') {
+      ctx.strokeStyle = '#00e050';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, w, h);
+      ctx.font = '16px Arial';
+      const label = p.class + ' ' + Math.round(p.score*100) + '%';
+      const tw = ctx.measureText(label).width + 8;
+      ctx.fillStyle = '#00e050';
+      ctx.fillRect(x, Math.max(0, y-22), tw, 22);
+      ctx.fillStyle = '#000';
+      ctx.fillText(label, x+4, Math.max(16, y-6));
+    } else {
+      ctx.fillStyle = '#ff2020';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  const areaPx = rect.w * rect.h;
+  $('total').textContent = preds.length;
+  $('inArea').textContent = inArea;
+  $('density').textContent = (inArea / (areaPx / 10000)).toFixed(2);
+  $('cover').textContent = Math.min(100, Math.round(covered / areaPx * 100)) + '%';
+  $('list').textContent = preds.length
+    ? 'Seen: ' + Object.entries(counts).map(([k,v]) => v + ' × ' + k).join(', ')
+    : 'No objects seen right now.';
+
+  requestAnimationFrame(() => loop(model));
+}
+
+start();
+</script>
+</body>
+</html>
