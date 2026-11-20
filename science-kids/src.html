@@ -226,14 +226,19 @@ function ambient(kind){
 
 /* ---------- voice + caption ---------- */
 var lastSay='';
+/* Indian English, young cheerful female voice where the device has one (e.g. Veena on iPad) */
 function pickVoice(){
-  try{var vs=speechSynthesis.getVoices().filter(function(v){return /^en/i.test(v.lang)});
-    return vs.filter(function(v){return /samantha|karen|serena|female|google us/i.test(v.name)})[0]||vs[0]||null}catch(e){return null}
+  try{var all=speechSynthesis.getVoices();
+    var inn=all.filter(function(v){return /en[-_]IN/i.test(v.lang)});
+    var fem=inn.filter(function(v){return /veena|neerja|heera|priya|kajal|female|google/i.test(v.name)&&!/rishi|ravi|male$/i.test(v.name)})[0];
+    if(fem)return fem;if(inn[0])return inn[0];
+    var en=all.filter(function(v){return /^en/i.test(v.lang)});
+    return en.filter(function(v){return /samantha|karen|serena|female/i.test(v.name)})[0]||en[0]||null}catch(e){return null}
 }
 function say(t,silentCaption){
   lastSay=t;$('#caption').textContent=t;
   if(muted||!('speechSynthesis' in window))return;
-  try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.85;u.pitch=1.25;u.lang='en-US';var v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}
+  try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.6;u.pitch=1.7;u.volume=1;u.lang='en-IN';var v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}
 }
 
 /* ---------- effects + stars ---------- */
@@ -269,7 +274,7 @@ $('#mute').onclick=function(){
   muted=!muted;this.textContent=muted?'🔇':'🔊';
   if(muted){try{speechSynthesis.cancel()}catch(e){}if(AC)try{AC.suspend()}catch(e){}}else{ac();sfx.tap()}
 };
-$('#go').onclick=function(){ac();sfx.good();$('#start').remove();say("Hi friend! Let's learn about science!");};
+$('#go').onclick=function(){ac();sfx.good();$('#start').remove();say("Hello my friend! Come, let's play and learn science! Yay!");};
 
 function home(){
   var g=el('div','home');
@@ -305,7 +310,7 @@ function quiz(root,cfg){
       b.style.background=c.color;
       b.onclick=function(){
         if(c.id===item.a){right(card,c,b)}
-        else{b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');sfx.bad();say('Oops! Try again!')}
+        else{b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');sfx.bad();say('Oh oh! Try again! You can do it!')}
       };
       ch.appendChild(b)});
     card.appendChild(ch);md.appendChild(card);stage.appendChild(md);
@@ -313,7 +318,7 @@ function quiz(root,cfg){
   }
   function right(card,c,b){
     celebrate(b);
-    var text='Yes! '+item.f;
+    var text=['Yay! ','Wow! ','Hooray! ','Super! '][Math.floor(Math.random()*4)]+item.f;
     card.innerHTML='';
     var an=el('div','answer','<span class="em">'+item.e+'</span><p>'+text+'</p>');
     var nx=el('button','next','➡️');nx.setAttribute('aria-label','Next');
@@ -436,7 +441,7 @@ ACTS.floatsink={title:'Float or Sink',run:function(root){
   }
   function finish(){
     if(!wrap.isConnected)return;
-    celebrate();say('Great job! Some things float, and some things sink!');
+    celebrate();say('Hooray! Great job! Some things float, and some things sink!');
     var d=el('div','modal'),c=el('div','card answer','<span class="em">🎉</span><p>Some things float. Some things sink!</p>');
     var nx=el('button','next','🔄');nx.setAttribute('aria-label','Play again');
     nx.onclick=function(){sfx.tap();root.innerHTML='';ACTS.floatsink.run(root)};
@@ -465,7 +470,7 @@ ACTS.colors={title:'Mix Colors',run:function(root){
         say(C[first].n+' and '+C[k].n+'...');
         setTimeout(function(){
           blob.classList.remove('swirl');blob.style.background=res[1];
-          var t=C[first].n+' and '+C[k].n+' make '+res[0]+'!';say(t);replay=function(){say(t)};celebrate(bowl);
+          var t='Wow! '+C[first].n+' and '+C[k].n+' make '+res[0]+'!';say(t);replay=function(){say(t)};celebrate(bowl);
           first=null;busy=false;
         },1200);
       }
