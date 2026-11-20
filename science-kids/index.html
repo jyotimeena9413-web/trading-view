@@ -167,6 +167,44 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .vbtn.wide{font-size:clamp(20px,3.4vmin,30px);font-weight:600}
 .vbtn small{font-size:.65em;opacity:.7}
 .vbtn.on{background:var(--sun)}
+.earth{height:100%;display:flex;flex-direction:column;gap:10px}
+.etop{display:flex;justify-content:flex-end;gap:12px}
+.etop .magic{position:static}
+.geo-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:clamp(8px,2vmin,18px);overflow:auto}
+.gcard{border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#fff;font-weight:700;font-size:clamp(16px,3.2vmin,32px);text-shadow:0 2px 3px rgba(0,0,0,.35);box-shadow:0 7px 0 rgba(34,48,92,.2);min-height:90px;padding:4px}
+.gcard:active{transform:translateY(5px);box-shadow:0 2px 0 rgba(34,48,92,.2)}
+.gcard .em{font-size:clamp(44px,10vmin,100px);line-height:1}
+.choice span:not(.em){text-shadow:0 2px 3px rgba(0,0,0,.35)}
+.geo{position:relative;height:clamp(170px,40vmin,380px);border-radius:28px;overflow:hidden;display:grid;place-items:center;margin-bottom:8px}
+.geo .em{font-size:clamp(100px,26vmin,240px);line-height:1;position:relative;z-index:1;animation:bounce 1.6s ease-in-out infinite}
+.fx-heat .em{animation:heat 1.1s ease-in-out infinite}
+@keyframes heat{50%{transform:skewX(5deg) scaleY(1.04)}}
+.fx-sway .em{transform-origin:50% 100%;animation:sway 1.8s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+.fx-flow::after{content:"";position:absolute;top:0;bottom:0;left:-60px;right:-60px;background:repeating-linear-gradient(90deg,transparent 0 30px,rgba(255,255,255,.22) 30px 40px);animation:slide 1s linear infinite}
+@keyframes slide{to{transform:translateX(40px)}}
+.puff{position:absolute;font-size:clamp(30px,7vmin,64px);z-index:2;line-height:1}
+.m-rise{bottom:40%;animation:rise 3s ease-out infinite}
+@keyframes rise{from{transform:translateY(0) scale(.6);opacity:1}to{transform:translateY(-28vmin) scale(1.5);opacity:0}}
+.m-fall{top:-12%;animation:fall 3s linear infinite}
+@keyframes fall{to{transform:translateY(48vmin) rotate(180deg)}}
+.m-drift{animation:driftx 6s linear infinite}
+@keyframes driftx{from{left:-15%}to{left:105%}}
+.gfact{font-size:clamp(22px,4.4vmin,42px);font-weight:600;margin:6px 0 14px}
+.world{height:100%;display:flex;flex-direction:column;gap:10px}
+.mapbox{flex:1;min-height:0}
+.mapbox svg{width:100%;height:100%;display:block}
+.cont{stroke:#fff;stroke-width:4;stroke-linejoin:round;cursor:pointer;transform-box:fill-box;transform-origin:center}
+.cont.hot{animation:cpulse .5s ease-in-out 4}
+@keyframes cpulse{50%{transform:scale(1.07)}}
+.clab{font:700 24px var(--font);fill:#22305c;paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round;pointer-events:none;text-anchor:middle}
+.olab{font:600 19px var(--font);fill:#fff;font-style:italic;pointer-events:none;text-anchor:middle;opacity:.95}
+.apop{font-size:64px;text-anchor:middle;pointer-events:none;transform-box:fill-box;transform-origin:center;animation:apop 2.6s ease-out forwards}
+@keyframes apop{0%{transform:scale(.3);opacity:0}20%{transform:scale(1.2);opacity:1}80%{opacity:1}100%{transform:translateY(-40px);opacity:0}}
+.rip{fill:none;stroke:#fff;stroke-width:5;pointer-events:none;transform-box:fill-box;transform-origin:center;animation:rip 1s ease-out forwards}
+@keyframes rip{from{transform:scale(.2);opacity:1}to{transform:scale(2.6);opacity:0}}
+.wbar{display:flex;gap:clamp(8px,2vmin,18px);justify-content:center;flex-wrap:wrap}
+.wbar .magic{position:static}
 </style>
 
 <div id="app">
@@ -249,9 +287,10 @@ function ambient(kind){
   var s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
   s.buffer=b;s.loop=true;
   var lfo=null;
-  if(kind==='rain'){f.type='highpass';f.frequency.value=1500;g.gain.value=.09}
-  else{f.type='lowpass';f.frequency.value=600;g.gain.value=.12;
-    lfo=a.createOscillator();var lg=a.createGain();lfo.frequency.value=.3;lg.gain.value=.08;lfo.connect(lg);lg.connect(g.gain);lfo.start()}
+  /* [filter, cutoff, volume, wobble speed, wobble depth] */
+  var K={rain:['highpass',1500,.09,0,0],wind:['lowpass',600,.12,.3,.08],waves:['lowpass',900,.14,.12,.12],river:['bandpass',1400,.07,1.5,.015],rumble:['lowpass',140,.5,.5,.25]}[kind]||['lowpass',600,.12,0,0];
+  f.type=K[0];f.frequency.value=K[1];g.gain.value=K[2];
+  if(K[3]){lfo=a.createOscillator();var lg=a.createGain();lfo.frequency.value=K[3];lg.gain.value=K[4];lfo.connect(lg);lg.connect(g.gain);lfo.start()}
   s.connect(f);f.connect(g);g.connect(a.destination);s.start();
   return function(){try{g.gain.setTargetAtTime(0,a.currentTime,.1);s.stop(a.currentTime+.5);if(lfo)lfo.stop(a.currentTime+.5)}catch(e){}};
 }
@@ -367,7 +406,7 @@ function home(){
   var g=el('div','home');
   [['states','🧊',['Solid, Liquid, Gas','सॉलिड, लिक्विड, गैस'],'var(--ocean)'],['floatsink','🦆',['Float or Sink','तैरे या डूबे'],'var(--leaf)'],
    ['hotcold','🔥',['Hot or Cold','गरम या ठंडा'],'var(--coral)'],['colors','🎨',['Mix Colors','रंग मिलाओ'],'var(--grape)'],
-   ['daynight','🌙',['Day and Night','दिन और रात'],'#3d4fb5'],['weather','🌧️',['Weather','मौसम'],'var(--pink)']].forEach(function(t){
+   ['daynight','🌙',['Day and Night','दिन और रात'],'#3d4fb5'],['weather','🌧️',['Weather','मौसम'],'var(--pink)'],['earth','🏔️',['Our Earth','हमारी धरती'],'#16a39a'],['world','🌍',['World Map','दुनिया का नक्शा'],'#0d7fd1']].forEach(function(t){
     var b=el('button','tile','<span class="em">'+t[1]+'</span><span>'+tx(t[2])+'</span>');
     b.style.background=t[3];
     b.onclick=function(){sfx.tap();go(t[0])};
@@ -633,6 +672,156 @@ ACTS.weather={title:['Weather','मौसम'],run:function(root){
   resize();window.addEventListener('resize',resize);frame();
   onLeave(function(){cancelAnimationFrame(raf);window.removeEventListener('resize',resize);stopAmb();clearInterval(timer)});
   set('sunny',false);var intro=tx(['Touch a picture to change the weather!','तस्वीर को छुओ, मौसम बदल जाएगा!']);say(intro);replay=function(){say(intro)};
+}};
+
+ACTS.earth={title:['Our Earth','हमारी धरती'],run:function(root){
+  var F=[
+   {e:'⛰️',n:['Mountain','पहाड़'],bg:'linear-gradient(#4aa8ee,#9fdcff 62%,#4f9e55 62%)',bits:['☁️','🦅'],mo:'drift',snd:'wind',
+    f:['A mountain is very, very tall! It goes up, up, up to the sky!','पहाड़ बहुत बहुत ऊँचा होता है! यह ऊपर, ऊपर, आसमान तक जाता है!']},
+   {e:'🏔️',n:['Snowy mountain','बर्फ़ वाला पहाड़'],bg:'linear-gradient(#5f8fd6,#b9d2f2)',bits:['❄️','❄️','❄️','❄️'],mo:'fall',snd:'wind',
+    f:['The Himalaya mountains are so high, they have snow on top! Brrr!','हिमालय पहाड़ बहुत ऊँचे हैं, उन पर बर्फ़ होती है! ब्रर्र!']},
+   {e:'🏞️',n:['River','नदी'],bg:'linear-gradient(#3fb36b,#2f8fe8)',fx:'fx-flow',bits:['🐟','🦆'],mo:'drift',snd:'river',
+    f:['A river is water that flows and flows, all the way to the sea! The Ganga is a river.','नदी का पानी बहता रहता है, बहता रहता है, समुद्र तक! गंगा एक नदी है।']},
+   {e:'🌊',n:['Ocean','समुद्र'],bg:'linear-gradient(#1e88e5,#0b4fa8)',fx:'fx-flow',bits:['🐳','🐟','🐠'],mo:'drift',snd:'waves',
+    f:['The ocean is big, big water! It is salty. Fish and whales live there!','समुद्र बहुत बड़ा पानी है! इसका पानी नमकीन होता है। इसमें मछली और व्हेल रहती हैं!']},
+   {e:'🏖️',n:['Beach','बीच'],bg:'linear-gradient(#45b8ec 50%,#f2c25a 50%)',bits:['🦀','🐚'],mo:'drift',snd:'waves',
+    f:['A beach has soft sand next to the sea. Let us build a sand castle!','बीच पर समुद्र के पास नरम रेत होती है। चलो रेत का घर बनाएँ!']},
+   {e:'🏝️',n:['Island','टापू'],bg:'linear-gradient(#36b3ef,#1e7fd8)',fx:'fx-flow',bits:['🐬','⛵'],mo:'drift',snd:'waves',
+    f:['An island is land with water all around it! Sri Lanka is an island near India.','टापू वह ज़मीन है जिसके चारों तरफ़ पानी ही पानी होता है! श्रीलंका भारत के पास एक टापू है।']},
+   {e:'🏜️',n:['Desert','रेगिस्तान'],bg:'linear-gradient(#ffa63d,#e08a1e)',fx:'fx-heat',bits:['🐪','🌵'],mo:'drift',snd:'wind',
+    f:['A desert is very hot and dry, with lots of sand. Camels live there!','रेगिस्तान बहुत गरम और सूखा होता है, बहुत सारी रेत होती है। वहाँ ऊँट रहते हैं!']},
+   {e:'🌋',n:['Volcano','आग वाला पहाड़'],bg:'linear-gradient(#e8573a,#7a2416)',bits:['💨','☁️','🔥'],mo:'rise',snd:'rumble',
+    f:['A volcano is a mountain with hot fire inside! Boom!','इसे ज्वालामुखी कहते हैं, आग वाला पहाड़! इसके अंदर बहुत गरम आग होती है! धड़ाम!']},
+   {e:'🌳',n:['Forest','जंगल'],bg:'linear-gradient(#4fbf6a,#257a3c)',fx:'fx-sway',bits:['🐒','🦜','🦋'],mo:'drift',snd:'birds',
+    f:['A forest has lots and lots of trees. Monkeys and birds live there!','जंगल में बहुत सारे पेड़ होते हैं। वहाँ बंदर और चिड़िया रहते हैं!']}];
+  var intro=tx(['Mountains, rivers, oceans! Touch a picture to see our Earth!','पहाड़, नदी, समुद्र! तस्वीर को छुओ और हमारी धरती देखो!']);
+  var stopA=function(){},tm=0;
+  function quiet(){stopA();stopA=function(){};clearInterval(tm)}
+  onLeave(quiet);
+  function sound(k){quiet();if(k==='birds'){sfx.chirp();tm=setInterval(sfx.chirp,1800)}else stopA=ambient(k)}
+  function low(f){return f.n[0].toLowerCase()}
+  function scene(f){
+    var g=el('div','geo '+(f.fx||''));g.style.background=f.bg;g.appendChild(el('div','em',f.e));
+    (f.bits||[]).forEach(function(b,k){var p=el('span','puff m-'+f.mo,b);p.style.animationDelay=(-k*(f.mo==='drift'?2.2:1))+'s';
+      if(f.mo==='drift')p.style.top=(15+k*22)+'%';else p.style.left=rnd(10,80)+'%';g.appendChild(p)});
+    return g;
+  }
+  function modal(){var md=el('div','modal'),card=el('div','card');md.appendChild(card);root.appendChild(md);return {md:md,card:card}}
+  function closeBtn(m){var c=el('button','next','✔️');c.setAttribute('aria-label','Close');c.onclick=function(){sfx.tap();quiet();m.md.remove();replay=function(){say(intro)}};return c}
+  function open(f){
+    var m=modal(),t=tx(f.f);
+    m.card.append(scene(f),el('h2','',tx(f.n)),el('p','gfact',t),closeBtn(m));
+    sound(f.snd);say(t);replay=function(){say(t)};
+  }
+  function game(){
+    var target=pick(F),opts=shuffle([target].concat(shuffle(F.filter(function(x){return x!==target})).slice(0,2)));
+    var m=modal(),q=H()?tx(target.n)+' कहाँ है? उसे छुओ!':'Where is the '+low(target)+'? Touch it!';
+    m.card.appendChild(el('h2','',q));var ch=el('div','choices');
+    opts.forEach(function(o){
+      var b=el('button','choice','<span class="em">'+o.e+'</span><span>'+tx(o.n)+'</span>');b.style.background=o.bg;
+      b.onclick=function(){
+        if(o===target){
+          celebrate(b);m.card.innerHTML='';var t=pick(YAY[LANG])+tx(o.f);
+          var nx=el('button','next','➡️');nx.setAttribute('aria-label','Next');nx.onclick=function(){sfx.tap();quiet();m.md.remove();game()};
+          var row=el('div','choices');row.append(nx,closeBtn(m));
+          m.card.append(scene(o),el('p','gfact',t),row);sound(o.snd);say(t);replay=function(){say(t)};
+        }else{
+          b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');sfx.bad();
+          say(H()?'यह तो '+tx(o.n)+' है! '+tx(target.n)+' ढूँढो!':'That is the '+low(o)+'! Find the '+low(target)+'!');
+        }
+      };
+      ch.appendChild(b)});
+    m.card.appendChild(ch);say(q);replay=function(){say(q)};
+  }
+  var wrap=el('div','earth'),top=el('div','etop'),find=el('button','magic',tx(['🔍 Find it!','🔍 ढूँढो!'])),grid=el('div','geo-grid');
+  find.onclick=function(){sfx.tap();game()};var wb=el('button','magic',tx(['🌍 World','🌍 दुनिया']));wb.style.background='#0d7fd1';wb.onclick=function(){sfx.tap();go('world')};top.append(wb,find);
+  F.forEach(function(f){var b=el('button','gcard','<span class="em">'+f.e+'</span><span>'+tx(f.n)+'</span>');b.style.background=f.bg;
+    b.onclick=function(){sfx.tap();open(f)};grid.appendChild(b)});
+  wrap.append(top,grid);root.appendChild(wrap);
+  say(intro);replay=function(){say(intro)};
+}};
+
+ACTS.world={title:['World Map','दुनिया का नक्शा'],run:function(root){
+  /* Simplified world map: 7 continents (biggest first, the order children learn them) and 5 oceans. */
+  var C=[
+   {id:'asia',n:['Asia','एशिया'],c:'#ffd23f',a:'🐘',l:[760,115],p:['611,61 694,42 806,36 889,50 972,69 944,97 889,125 839,167 800,200 778,242 756,189 722,228 700,194 661,181 639,167 597,150 625,125'],
+    f:['This is Asia, the biggest continent! India is in Asia. We live here!','यह एशिया है, सबसे बड़ा कॉन्टिनेंट! भारत एशिया में है। हम यहीं रहते हैं!']},
+   {id:'africa',n:['Africa','अफ्रीका'],c:'#ff7a59',a:'🦁',l:[562,240],p:['453,192 472,153 528,147 589,164 619,217 642,219 611,292 589,328 556,347 533,297 525,239 478,239 453,211'],
+    f:['This is Africa! Lions, giraffes and zebras live here!','यह अफ्रीका है! यहाँ शेर, जिराफ़ और ज़ेबरा रहते हैं!']},
+   {id:'na',n:['North America','नॉर्थ अमेरिका'],c:'#ffa63d',a:'🐻',l:[205,135],p:['42,69 111,56 236,50 319,83 347,111 278,181 231,200 272,228 208,189 172,158 153,117 83,83 42,97','361,22 431,50 375,83 347,56'],
+    f:['This is North America! Bears and eagles live here!','यह नॉर्थ अमेरिका है! यहाँ भालू और ईगल रहते हैं!']},
+   {id:'sa',n:['South America','साउथ अमेरिका'],c:'#4cd07d',a:'🦜',l:[338,300],p:['278,222 333,222 403,264 389,311 339,356 306,403 292,361 303,300 275,264'],
+    f:['This is South America! The big Amazon forest is here, with parrots and monkeys!','यह साउथ अमेरिका है! यहाँ अमेज़न का बड़ा जंगल है, तोते और बंदर रहते हैं!']},
+   {id:'antarctica',n:['Antarctica','अंटार्कटिका'],c:'#ffffff',a:'🐧',l:[500,474],p:['70,452 200,446 400,458 600,442 800,452 930,446 950,470 930,488 500,492 70,488 50,470'],
+    f:['This is Antarctica! It is very, very cold and icy. Penguins live here!','यह अंटार्कटिका है! यहाँ बहुत बहुत ठंड और बर्फ़ है। यहाँ पेंगुइन रहते हैं!']},
+   {id:'europe',n:['Europe','यूरोप'],c:'#b07cff',a:'🏰',l:[552,100],p:['472,150 472,128 500,111 514,83 569,53 611,61 625,125 578,139 542,144 508,131'],
+    f:['This is Europe! It has lots of old castles!','यह यूरोप है! यहाँ बहुत सारे पुराने क़िले हैं!']},
+   {id:'australia',n:['Australia','ऑस्ट्रेलिया'],c:'#ff8fc7',a:'🦘',l:[868,325],p:['817,311 861,283 894,281 925,325 908,356 875,344 819,344'],
+    f:['This is Australia! Kangaroos and koalas live here! Boing, boing!','यह ऑस्ट्रेलिया है! यहाँ कंगारू और कोआला रहते हैं! उछल, उछल!']}];
+  var O=[
+   {id:'pacific',n:['Pacific Ocean','पैसिफ़िक ओशन'],at:[[110,280],[955,215]],f:['This is the Pacific Ocean, the biggest ocean of all!','यह पैसिफ़िक ओशन है, सबसे बड़ा समुद्र!']},
+   {id:'atlantic',n:['Atlantic Ocean','अटलांटिक ओशन'],at:[[425,200]],f:['This is the Atlantic Ocean! Big whales swim here!','यह अटलांटिक ओशन है! इसमें बड़ी बड़ी व्हेल तैरती हैं!']},
+   {id:'indian',n:['Indian Ocean','इंडियन ओशन'],at:[[705,300]],f:['This is the Indian Ocean! It is next to India!','यह इंडियन ओशन है! यह भारत के पास है!']},
+   {id:'arctic',n:['Arctic Ocean','आर्कटिक ओशन'],at:[[500,-14],[230,8]],f:['This is the Arctic Ocean, at the very top. It is icy cold! Polar bears live here!','यह आर्कटिक ओशन है, सबसे ऊपर। यह बहुत ठंडा है! यहाँ सफ़ेद भालू रहते हैं!']},
+   {id:'southern',n:['Southern Ocean','सदर्न ओशन'],at:[[650,412],[220,425]],f:['This is the Southern Ocean, all around Antarctica!','यह सदर्न ओशन है, अंटार्कटिका के चारों तरफ़!']}];
+  var NUM=[['One','एक'],['Two','दो'],['Three','तीन'],['Four','चार'],['Five','पाँच'],['Six','छह'],['Seven','सात']];
+  function smooth(pts){
+    var P=pts.split(' ').map(function(s){return s.split(',').map(Number)}),n=P.length,d='M'+P[0];
+    for(var i=0;i<n;i++){var p0=P[(i-1+n)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];
+      d+='C'+[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6]+' '+[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6]+' '+p2}
+    return d+'Z';
+  }
+  function nm(x){return tx(x.n)}
+  function theName(x){return H()?nm(x):(x.at?'the ':'')+nm(x)}
+  var svgs='<svg viewBox="0 -40 1000 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="World map">'+
+    '<rect x="0" y="-40" width="1000" height="540" rx="30" fill="#2f9bff"/>';
+  C.forEach(function(c){c.p.forEach(function(pp){svgs+='<path class="cont" data-id="'+c.id+'" d="'+smooth(pp)+'" fill="'+c.c+'"/>'})});
+  O.forEach(function(o){o.at.forEach(function(a){svgs+='<text class="olab" x="'+a[0]+'" y="'+a[1]+'">'+nm(o)+'</text>'})});
+  C.forEach(function(c){svgs+='<text class="clab" x="'+c.l[0]+'" y="'+c.l[1]+'">'+nm(c)+'</text>'});
+  svgs+='</svg>';
+  var wrap=el('div','world'),box=el('div','mapbox',svgs),bar=el('div','wbar');
+  var bc=el('button','magic',tx(['🌍 7 Continents','🌍 7 कॉन्टिनेंट'])),bo=el('button','magic',tx(['🌊 5 Oceans','🌊 5 ओशन'])),bf=el('button','magic',tx(['🔍 Find it!','🔍 ढूँढो!']));
+  bc.style.background='var(--leaf)';bo.style.background='var(--ocean)';
+  bar.append(bc,bo,bf);wrap.append(box,bar);root.appendChild(wrap);
+  var svg=$('svg',box),NS='http://www.w3.org/2000/svg',timers=[],target=null;
+  function stop(){timers.forEach(clearTimeout);timers=[]}
+  onLeave(stop);
+  function glow(c){svg.querySelectorAll('.cont[data-id="'+c.id+'"]').forEach(function(p){p.classList.remove('hot');void p.getBBox();p.classList.add('hot')});
+    var t=document.createElementNS(NS,'text');t.setAttribute('class','apop');t.setAttribute('x',c.l[0]);t.setAttribute('y',c.l[1]-42);t.textContent=c.a;svg.appendChild(t);setTimeout(function(){t.remove()},2700)}
+  function ripple(x,y){var r=document.createElementNS(NS,'circle');r.setAttribute('class','rip');r.setAttribute('cx',x);r.setAttribute('cy',y);r.setAttribute('r',30);svg.appendChild(r);setTimeout(function(){r.remove()},1100)}
+  function nearestOcean(x,y){var best=null,bd=1e9;O.forEach(function(o){o.at.forEach(function(a){var d=Math.hypot(a[0]-x,a[1]-y);if(d<bd){bd=d;best=o}})});return best}
+  function touched(item,x,y){
+    stop();
+    if(item.at){ripple(x,y);sfx.splash()}else{glow(item);sfx.tap()}
+    if(target){
+      if(item===target){var t=pick(YAY[LANG])+tx(item.f);target=null;celebrate(box);say(t);replay=function(){say(t)}}
+      else{sfx.bad();say(H()?'यह तो '+nm(item)+' है! '+nm(target)+' ढूँढो!':'That is '+theName(item)+'! Find '+theName(target)+'!')}
+      return;
+    }
+    var f=tx(item.f);say(f);replay=function(){say(f)};
+  }
+  svg.addEventListener('click',function(e){
+    var pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;var q=pt.matrixTransform(svg.getScreenCTM().inverse());
+    var hit=e.target.closest&&e.target.closest('.cont');
+    if(hit){var c=C.filter(function(x){return x.id===hit.getAttribute('data-id')})[0];touched(c,q.x,q.y)}
+    else touched(nearestOcean(q.x,q.y),q.x,q.y);
+  });
+  function chant(list,first,last){
+    stop();target=null;say(first);var k=0;
+    list.forEach(function(x,i){timers.push(setTimeout(function(){
+      if(x.at){x.at.forEach(function(a){ripple(a[0],a[1])});sfx.splash()}else{glow(x);sfx.tap()}
+      say(tx(NUM[i])+'! '+nm(x)+'!');
+    },3200+i*2600))});
+    timers.push(setTimeout(function(){celebrate(box);say(last)},3200+list.length*2600));
+    replay=function(){chant(list,first,last)};
+  }
+  bc.onclick=function(){sfx.tap();chant(C,tx(['There are seven continents! Let us count!','सात कॉन्टिनेंट हैं! चलो गिनें!']),tx(['Seven continents! Yay!','सात कॉन्टिनेंट! याय!']))};
+  bo.onclick=function(){sfx.tap();chant(O,tx(['There are five oceans! Let us count!','पाँच ओशन हैं! चलो गिनें!']),tx(['Five oceans! Hooray!','पाँच ओशन! शाबाश!']))};
+  bf.onclick=function(){sfx.tap();stop();var all=C.concat(O),t;do{t=pick(all)}while(t===target);target=t;
+    var q=H()?nm(target)+' कहाँ है? उसे छुओ!':'Where is '+theName(target)+'? Touch it!';say(q);replay=function(){say(q)}};
+  var intro=tx(['This is our world! The big pieces of land are called continents. There are seven continents! The blue water is the ocean. There are five oceans. Touch them!',
+                'यह हमारी दुनिया है! ज़मीन के बड़े बड़े टुकड़ों को कॉन्टिनेंट कहते हैं। सात कॉन्टिनेंट हैं! नीला पानी समुद्र है, इसे ओशन कहते हैं। पाँच ओशन हैं! इन्हें छुओ!']);
+  say(intro);replay=function(){say(intro)};
 }};
 
 showStars();
