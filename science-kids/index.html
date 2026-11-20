@@ -156,6 +156,17 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .done{display:grid;place-items:center;height:100%;text-align:center;gap:10px;align-content:center}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important}}
 #lang{font-size:clamp(20px,3.6vmin,32px);font-weight:700}
+#caption{gap:12px}
+#buddy{font-size:clamp(40px,7vmin,64px);line-height:1;display:inline-block;flex:none}
+#buddy.talk{animation:talk .35s ease-in-out infinite alternate}
+@keyframes talk{from{transform:translateY(0) rotate(-6deg) scale(1)}to{transform:translateY(-8px) rotate(6deg) scale(1.12)}}
+#vpanel{position:fixed;inset:0;z-index:80;background:rgba(34,48,92,.5);display:grid;place-items:center;padding:16px}
+#vpanel .card{max-height:90%}
+.vrow,.vlist{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:16px}
+.vbtn{background:#eef4ff;border-radius:24px;padding:10px 22px;font-size:clamp(30px,6vmin,52px);box-shadow:0 5px 0 rgba(34,48,92,.15)}
+.vbtn.wide{font-size:clamp(20px,3.4vmin,30px);font-weight:600}
+.vbtn small{font-size:.65em;opacity:.7}
+.vbtn.on{background:var(--sun)}
 </style>
 
 <div id="app">
@@ -163,6 +174,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
     <button class="round" id="back" aria-label="Home" hidden>🏠</button>
     <h1 id="ttl">Little Scientists</h1>
     <div class="right">
+      <button class="round" id="voice" aria-label="Voice">🎙️</button>
       <button class="round" id="lang" aria-label="Language">हिं</button>
       <button class="round" id="again" aria-label="Hear again" hidden>🗣️</button>
       <span id="stars">⭐ 0</span>
@@ -170,7 +182,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
     </div>
   </header>
   <main id="view"></main>
-  <div id="caption" aria-live="polite"></div>
+  <div id="caption"><span id="buddy" aria-hidden="true">🦄</span><span id="captxt" aria-live="polite"></span></div>
 </div>
 <div id="fx"></div>
 <div id="start"><h2>Little Scientists · छोटे वैज्ञानिक</h2><div class="row"><button id="go-en">▶ English</button><button id="go-hi">▶ हिन्दी</button></div></div>
@@ -245,25 +257,66 @@ function ambient(kind){
 }
 
 /* ---------- voice + caption ---------- */
-/* Hindi: hi-IN voice (Lekha on iPad). English: Indian English female voice (Veena on iPad). Slow (60%) and high-pitched for a small child. */
-var lastSay='';
-function pickVoice(){
+/* Female voices only. Lively delivery: each sentence is spoken separately and exclamations get extra pitch. Parents can pick a voice + speed in the 🎙️ menu. */
+var lastSay='',RATE=0.9;
+try{RATE=parseFloat(localStorage.getItem('ls_rate'))||0.9}catch(e){}
+var FEMALE=/veena|lekha|kalpana|swara|neerja|heera|priya|kajal|isha|aditi|raveena|ananya|samantha|karen|moira|tessa|serena|martha|catherine|fiona|victoria|allison|ava|susan|zoe|nicky|kate|flo|sandy|shelley|grandma|female|woman|google हिन्दी|google us english/i;
+var MALE=/rishi|ravi|hemant|prabhat|aaron|arthur|daniel|fred|gordon|oliver|ralph|albert|\balex\b|\btom\b|\blee\b|reed|rocko|eddy|grandpa|junior|bruce|\bmale\b/i;
+function isFemale(v){return FEMALE.test(v.name)&&!MALE.test(v.name)}
+function voicesFor(){
   try{var all=speechSynthesis.getVoices();
-    if(H()){
-      var hi=all.filter(function(v){return /^hi/i.test(v.lang)});
-      return hi.filter(function(v){return /lekha|kalpana|swara|female|google/i.test(v.name)})[0]||hi[0]||null;
-    }
-    var inn=all.filter(function(v){return /en[-_]IN/i.test(v.lang)});
-    var fem=inn.filter(function(v){return /veena|neerja|heera|priya|kajal|female|google/i.test(v.name)&&!/rishi|ravi|male$/i.test(v.name)})[0];
-    if(fem)return fem;if(inn[0])return inn[0];
-    var en=all.filter(function(v){return /^en/i.test(v.lang)});
-    return en.filter(function(v){return /samantha|karen|serena|female/i.test(v.name)})[0]||en[0]||null}catch(e){return null}
+    var re=H()?/^hi/i:/^en/i,list=all.filter(function(v){return re.test(v.lang)});
+    function score(v){return (isFemale(v)?0:10)+(/IN$/i.test(v.lang.replace('_','-'))?0:1)+(MALE.test(v.name)?20:0)}
+    return list.sort(function(a,b){return score(a)-score(b)});
+  }catch(e){return []}
+}
+function pickVoice(){
+  var list=voicesFor(),saved=null;
+  try{saved=localStorage.getItem('ls_voice_'+LANG)}catch(e){}
+  if(saved){var f=list.filter(function(v){return v.name===saved})[0];if(f)return f}
+  return list.filter(isFemale)[0]||list.filter(function(v){return !MALE.test(v.name)})[0]||list[0]||null;
 }
 function say(t){
-  lastSay=t;$('#caption').textContent=t;
+  lastSay=t;$('#captxt').textContent=t;
   if(muted||!('speechSynthesis' in window))return;
-  try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.6;u.pitch=1.7;u.volume=1;u.lang=H()?'hi-IN':'en-IN';var v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}
+  try{
+    speechSynthesis.cancel();
+    var v=pickVoice(),parts=t.match(/[^!?।.]+[!?।.]*/g)||[t],bud=$('#buddy');
+    parts.forEach(function(p,k){
+      p=p.trim();if(!p)return;
+      var u=new SpeechSynthesisUtterance(p),ex=/!$/.test(p);
+      u.rate=Math.min(1.3,RATE+(ex?.05:0));u.pitch=ex?1.6:1.4;u.volume=1;u.lang=H()?'hi-IN':'en-IN';if(v)u.voice=v;
+      if(k===0)u.onstart=function(){bud.classList.add('talk')};
+      if(k===parts.length-1){u.onend=u.onerror=function(){bud.classList.remove('talk')}}
+      speechSynthesis.speak(u);
+    });
+  }catch(e){}
 }
+function voicePanel(){
+  var old=$('#vpanel');if(old){old.remove();return}
+  var ov=el('div','','');ov.id='vpanel';var card=el('div','card');ov.appendChild(card);
+  card.appendChild(el('h2','',tx(['Voice','आवाज़'])));
+  var sp=el('div','vrow');
+  [['🐢',0.75],['🐇',0.9],['🚀',1.05]].forEach(function(r){
+    var b=el('button','vbtn'+(Math.abs(RATE-r[1])<.01?' on':''),r[0]);b.setAttribute('aria-label','Speed '+r[1]);
+    b.onclick=function(){RATE=r[1];try{localStorage.setItem('ls_rate',String(RATE))}catch(e){}sp.querySelectorAll('.vbtn').forEach(function(x){x.classList.remove('on')});b.classList.add('on');say(tx(['Hello! I am your science friend!','नमस्ते! मैं तुम्हारी साइंस दोस्त हूँ!']))};
+    sp.appendChild(b)});
+  card.appendChild(sp);
+  var list=voicesFor(),fem=list.filter(isFemale),show=fem.length?fem:list.filter(function(v){return !MALE.test(v.name)});
+  if(!show.length)show=list;
+  var cur=pickVoice(),lw=el('div','vlist');
+  if(!show.length)lw.appendChild(el('p','',tx(['No voice found. Download one in Settings → Accessibility → Spoken Content → Voices.','कोई आवाज़ नहीं मिली। Settings → Accessibility → Spoken Content → Voices में डाउनलोड करें।'])));
+  show.forEach(function(v){
+    var b=el('button','vbtn wide'+(cur&&cur.name===v.name?' on':''),'👩 '+v.name+' <small>'+v.lang+'</small>');
+    b.onclick=function(){try{localStorage.setItem('ls_voice_'+LANG,v.name)}catch(e){}lw.querySelectorAll('.vbtn').forEach(function(x){x.classList.remove('on')});b.classList.add('on');
+      say(tx(['Yay! Hello! I am your science friend! Let us play!','याय! नमस्ते! मैं तुम्हारी साइंस दोस्त हूँ! चलो खेलें!']))};
+    lw.appendChild(b)});
+  card.appendChild(lw);
+  var c=el('button','next','✔️');c.onclick=function(){ov.remove()};card.appendChild(c);
+  ov.onclick=function(e){if(e.target===ov)ov.remove()};
+  document.body.appendChild(ov);
+}
+try{speechSynthesis.onvoiceschanged=function(){}}catch(e){}
 
 /* ---------- effects + stars ---------- */
 var starCount=0;
@@ -286,13 +339,14 @@ function onLeave(fn){cleanups.push(fn)}
 function go(name){
   cleanups.forEach(function(f){try{f()}catch(e){}});cleanups=[];replay=null;cur=name;
   try{speechSynthesis.cancel()}catch(e){}
-  view.innerHTML='';$('#caption').textContent='';
+  view.innerHTML='';$('#captxt').textContent='';
   var a=ACTS[name];
   $('#back').hidden=!a;$('#again').hidden=!a;
   $('#ttl').textContent=a?tx(a.title):tx(['Little Scientists','छोटे वैज्ञानिक']);
   $('#lang').textContent=H()?'EN':'हिं';
   if(a){a.run(view)}else{home()}
 }
+$('#voice').onclick=function(){sfx.tap();voicePanel()};
 $('#back').onclick=function(){sfx.tap();go(null)};
 $('#again').onclick=function(){sfx.tap();if(replay)replay();else if(lastSay)say(lastSay)};
 $('#lang').onclick=function(){LANG=H()?'en':'hi';try{localStorage.setItem('ls_lang',LANG)}catch(e){}sfx.good();go(cur);
@@ -304,7 +358,7 @@ $('#mute').onclick=function(){
 function begin(l){
   LANG=l;try{localStorage.setItem('ls_lang',LANG)}catch(e){}
   ac();sfx.good();$('#start').remove();go(null);
-  say(tx(["Hello my friend! Come, let's play and learn science! Yay!",'नमस्ते दोस्त! आओ, खेलें और साइंस सीखें! याय!']));
+  say(tx(["Yay! Hello hello, my little friend! Come, let's play and learn science! Are you ready? Let's go!",'याय! नमस्ते नमस्ते, मेरी छोटी दोस्त! आओ, खेलें और साइंस सीखें! तैयार हो? चलो!']));
 }
 $('#go-en').onclick=function(){begin('en')};
 $('#go-hi').onclick=function(){begin('hi')};
