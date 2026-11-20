@@ -1,12 +1,12 @@
 <title>Little Scientists</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+Devanagari:wght@500;700&display=swap">
 <style>
 /* Layout: one full-screen app. Big colourful home tiles, each opening a full-screen touch activity. No reading needed: voice, sound and motion carry everything. */
 :root{
   --sky:#d6f1ff; --ink:#22305c; --paper:#ffffff;
   --coral:#ff6b5e; --sun:#ffc93c; --leaf:#34c47c; --grape:#8b6cff; --ocean:#2f9bff; --pink:#ff7eb6;
-  --font:'Fredoka','Arial Rounded MT Bold',ui-rounded,system-ui,sans-serif;
+  --font:'Fredoka','Noto Sans Devanagari','Arial Rounded MT Bold',ui-rounded,system-ui,sans-serif;
   color-scheme:light;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -31,7 +31,9 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 /* start overlay */
 #start{position:fixed;inset:0;z-index:100;background:var(--sky);display:grid;place-items:center;align-content:center;gap:18px;text-align:center}
 #start h2{margin:0;font-size:clamp(40px,9vmin,90px)}
-#start button{width:clamp(150px,30vmin,280px);height:clamp(150px,30vmin,280px);border-radius:50%;background:var(--coral);color:#fff;font-size:clamp(70px,15vmin,140px);box-shadow:0 12px 0 rgba(34,48,92,.25);animation:pulse 1.4s ease-in-out infinite}
+#start .row{display:flex;gap:clamp(14px,3vmin,34px);flex-wrap:wrap;justify-content:center;padding:0 16px}
+#start button{border-radius:44px;padding:clamp(16px,4vmin,40px) clamp(26px,7vmin,80px);background:var(--coral);color:#fff;font-size:clamp(34px,8vmin,80px);font-weight:700;box-shadow:0 12px 0 rgba(34,48,92,.25);animation:pulse 1.4s ease-in-out infinite}
+#start button+button{background:var(--leaf);animation-delay:-.7s}
 @keyframes pulse{50%{transform:scale(1.07)}}
 
 /* home */
@@ -146,6 +148,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .wb:active{transform:translateY(4px)}
 .done{display:grid;place-items:center;height:100%;text-align:center;gap:10px;align-content:center}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+#lang{font-size:clamp(20px,3.6vmin,32px);font-weight:700}
 </style>
 
 <div id="app">
@@ -153,6 +156,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
     <button class="round" id="back" aria-label="Home" hidden>🏠</button>
     <h1 id="ttl">Little Scientists</h1>
     <div class="right">
+      <button class="round" id="lang" aria-label="Language">हिं</button>
       <button class="round" id="again" aria-label="Hear again" hidden>🗣️</button>
       <span id="stars">⭐ 0</span>
       <button class="round" id="mute" aria-label="Sound on or off">🔊</button>
@@ -162,7 +166,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
   <div id="caption" aria-live="polite"></div>
 </div>
 <div id="fx"></div>
-<div id="start"><h2>Little Scientists</h2><button id="go" aria-label="Start">▶</button></div>
+<div id="start"><h2>Little Scientists · छोटे वैज्ञानिक</h2><div class="row"><button id="go-en">▶ English</button><button id="go-hi">▶ हिन्दी</button></div></div>
 
 <script>
 (function(){
@@ -171,6 +175,15 @@ var $=function(s,r){return (r||document).querySelector(s)};
 function el(t,c,h){var e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e}
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
 function rnd(a,b){return a+Math.random()*(b-a)}
+
+/* ---------- language: [English, Hindi] pairs ---------- */
+var LANG='en';
+try{LANG=localStorage.getItem('ls_lang')==='hi'?'hi':'en'}catch(e){}
+function H(){return LANG==='hi'}
+function tx(x){return Array.isArray(x)?(H()?x[1]:x[0]):x}
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+var YAY={en:['Yay! ','Wow! ','Hooray! ','Super! '],hi:['याय! ','वाह! ','शाबाश! ','बहुत बढ़िया! ']};
+var OOPS=['Oh oh! Try again! You can do it!','अरे! फिर से कोशिश करो! तुम कर सकते हो!'];
 
 /* ---------- audio ---------- */
 var muted=false,AC=null,NB=null;
@@ -225,20 +238,24 @@ function ambient(kind){
 }
 
 /* ---------- voice + caption ---------- */
+/* Hindi: hi-IN voice (Lekha on iPad). English: Indian English female voice (Veena on iPad). Slow (60%) and high-pitched for a small child. */
 var lastSay='';
-/* Indian English, young cheerful female voice where the device has one (e.g. Veena on iPad) */
 function pickVoice(){
   try{var all=speechSynthesis.getVoices();
+    if(H()){
+      var hi=all.filter(function(v){return /^hi/i.test(v.lang)});
+      return hi.filter(function(v){return /lekha|kalpana|swara|female|google/i.test(v.name)})[0]||hi[0]||null;
+    }
     var inn=all.filter(function(v){return /en[-_]IN/i.test(v.lang)});
     var fem=inn.filter(function(v){return /veena|neerja|heera|priya|kajal|female|google/i.test(v.name)&&!/rishi|ravi|male$/i.test(v.name)})[0];
     if(fem)return fem;if(inn[0])return inn[0];
     var en=all.filter(function(v){return /^en/i.test(v.lang)});
     return en.filter(function(v){return /samantha|karen|serena|female/i.test(v.name)})[0]||en[0]||null}catch(e){return null}
 }
-function say(t,silentCaption){
+function say(t){
   lastSay=t;$('#caption').textContent=t;
   if(muted||!('speechSynthesis' in window))return;
-  try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.6;u.pitch=1.7;u.volume=1;u.lang='en-IN';var v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}
+  try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.6;u.pitch=1.7;u.volume=1;u.lang=H()?'hi-IN':'en-IN';var v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}
 }
 
 /* ---------- effects + stars ---------- */
@@ -257,30 +274,40 @@ function confetti(x,y){
 function celebrate(node){var r=node?node.getBoundingClientRect():null;confetti(r?r.left+r.width/2:null,r?r.top+r.height/2:null);sfx.good();addStar()}
 
 /* ---------- router ---------- */
-var cleanups=[],replay=null,view=$('#view');
+var cleanups=[],replay=null,view=$('#view'),cur=null;
 function onLeave(fn){cleanups.push(fn)}
 function go(name){
-  cleanups.forEach(function(f){try{f()}catch(e){}});cleanups=[];replay=null;
+  cleanups.forEach(function(f){try{f()}catch(e){}});cleanups=[];replay=null;cur=name;
   try{speechSynthesis.cancel()}catch(e){}
   view.innerHTML='';$('#caption').textContent='';
   var a=ACTS[name];
   $('#back').hidden=!a;$('#again').hidden=!a;
-  $('#ttl').textContent=a?a.title:'Little Scientists';
+  $('#ttl').textContent=a?tx(a.title):tx(['Little Scientists','छोटे वैज्ञानिक']);
+  $('#lang').textContent=H()?'EN':'हिं';
   if(a){a.run(view)}else{home()}
 }
 $('#back').onclick=function(){sfx.tap();go(null)};
 $('#again').onclick=function(){sfx.tap();if(replay)replay();else if(lastSay)say(lastSay)};
+$('#lang').onclick=function(){LANG=H()?'en':'hi';try{localStorage.setItem('ls_lang',LANG)}catch(e){}sfx.good();go(cur);
+  if(!cur)say(tx(['Hello! Pick a game!','नमस्ते! कोई खेल चुनो!']))};
 $('#mute').onclick=function(){
   muted=!muted;this.textContent=muted?'🔇':'🔊';
   if(muted){try{speechSynthesis.cancel()}catch(e){}if(AC)try{AC.suspend()}catch(e){}}else{ac();sfx.tap()}
 };
-$('#go').onclick=function(){ac();sfx.good();$('#start').remove();say("Hello my friend! Come, let's play and learn science! Yay!");};
+function begin(l){
+  LANG=l;try{localStorage.setItem('ls_lang',LANG)}catch(e){}
+  ac();sfx.good();$('#start').remove();go(null);
+  say(tx(["Hello my friend! Come, let's play and learn science! Yay!",'नमस्ते दोस्त! आओ, खेलें और साइंस सीखें! याय!']));
+}
+$('#go-en').onclick=function(){begin('en')};
+$('#go-hi').onclick=function(){begin('hi')};
 
 function home(){
   var g=el('div','home');
-  [['states','🧊','Solid, Liquid, Gas','var(--ocean)'],['floatsink','🦆','Float or Sink','var(--leaf)'],['hotcold','🔥','Hot or Cold','var(--coral)'],
-   ['colors','🎨','Mix Colors','var(--grape)'],['daynight','🌙','Day and Night','#3d4fb5'],['weather','🌧️','Weather','var(--pink)']].forEach(function(t){
-    var b=el('button','tile','<span class="em">'+t[1]+'</span><span>'+t[2]+'</span>');
+  [['states','🧊',['Solid, Liquid, Gas','सॉलिड, लिक्विड, गैस'],'var(--ocean)'],['floatsink','🦆',['Float or Sink','तैरे या डूबे'],'var(--leaf)'],
+   ['hotcold','🔥',['Hot or Cold','गरम या ठंडा'],'var(--coral)'],['colors','🎨',['Mix Colors','रंग मिलाओ'],'var(--grape)'],
+   ['daynight','🌙',['Day and Night','दिन और रात'],'#3d4fb5'],['weather','🌧️',['Weather','मौसम'],'var(--pink)']].forEach(function(t){
+    var b=el('button','tile','<span class="em">'+t[1]+'</span><span>'+tx(t[2])+'</span>');
     b.style.background=t[3];
     b.onclick=function(){sfx.tap();go(t[0])};
     g.appendChild(b)});
@@ -291,13 +318,13 @@ function home(){
 function quiz(root,cfg){
   var order=shuffle(cfg.items),i=0,stage=el('div','stagebox'),item;
   root.appendChild(stage);
-  if(cfg.magic){var m=el('button','magic','✨ Magic');m.onclick=function(){sfx.tap();cfg.magic(root)};stage.appendChild(m)}
+  if(cfg.magic){var m=el('button','magic',tx(['✨ Magic','✨ जादू']));m.onclick=function(){sfx.tap();cfg.magic(root)};stage.appendChild(m)}
   function show(){
     item=order[i%order.length];
     stage.querySelectorAll('.big,.nm,.modal').forEach(function(n){n.remove()});
-    var big=el('div','big',item.e),nm=el('div','nm',item.n);
+    var big=el('div','big',item.e),nm=el('div','nm',tx(item.n));
     stage.appendChild(big);stage.appendChild(nm);
-    big.onclick=function(){sfx.pop&&0;sfx.tap();say(cfg.ask(item));if(!$('.modal',stage))ask()};
+    big.onclick=function(){sfx.tap();say(cfg.ask(item));if(!$('.modal',stage))ask()};
     replay=function(){say(cfg.ask(item))};
     say(cfg.ask(item));
     setTimeout(function(){if(!$('.modal',stage)&&stage.isConnected)ask()},1800);
@@ -306,19 +333,19 @@ function quiz(root,cfg){
     var md=el('div','modal'),card=el('div','card'),ch=el('div','choices');
     card.appendChild(el('h2','',cfg.q(item)));
     cfg.choices.forEach(function(c){
-      var b=el('button','choice','<span class="em">'+c.e+'</span><span>'+c.n+'</span>'+(c.hint?'<small>'+c.hint+'</small>':''));
+      var b=el('button','choice','<span class="em">'+c.e+'</span><span>'+tx(c.n)+'</span>'+(c.hint?'<small>'+tx(c.hint)+'</small>':''));
       b.style.background=c.color;
       b.onclick=function(){
-        if(c.id===item.a){right(card,c,b)}
-        else{b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');sfx.bad();say('Oh oh! Try again! You can do it!')}
+        if(c.id===item.a){right(card,b)}
+        else{b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');sfx.bad();say(tx(OOPS))}
       };
       ch.appendChild(b)});
     card.appendChild(ch);md.appendChild(card);stage.appendChild(md);
     replay=function(){say(cfg.ask(item))};
   }
-  function right(card,c,b){
+  function right(card,b){
     celebrate(b);
-    var text=['Yay! ','Wow! ','Hooray! ','Super! '][Math.floor(Math.random()*4)]+item.f;
+    var text=pick(YAY[LANG])+tx(item.f);
     card.innerHTML='';
     var an=el('div','answer','<span class="em">'+item.e+'</span><p>'+text+'</p>');
     var nx=el('button','next','➡️');nx.setAttribute('aria-label','Next');
@@ -332,33 +359,34 @@ function quiz(root,cfg){
 /* ---------- activities ---------- */
 var ACTS={};
 
-ACTS.states={title:'Solid, Liquid, Gas',run:function(root){
+ACTS.states={title:['Solid, Liquid, Gas','सॉलिड, लिक्विड, गैस'],run:function(root){
   var items=[
-    {e:'🧊',n:'Ice',a:'solid',f:'Ice is a solid. It is hard and cold!'},
-    {e:'🪨',n:'Rock',a:'solid',f:'A rock is a solid. You can hold it in your hand!'},
-    {e:'🧱',n:'Brick',a:'solid',f:'A brick is a solid. It keeps its shape!'},
-    {e:'⚽',n:'Ball',a:'solid',f:'A ball is a solid. It bounces and rolls!'},
-    {e:'💧',n:'Water',a:'liquid',f:'Water is a liquid. It splashes and pours!'},
-    {e:'🥛',n:'Milk',a:'liquid',f:'Milk is a liquid. You can pour it in a cup!'},
-    {e:'🍯',n:'Honey',a:'liquid',f:'Honey is a liquid. It pours slowly and it is sticky!'},
-    {e:'🧃',n:'Juice',a:'liquid',f:'Juice is a liquid. Yum, you can drink it!'},
-    {e:'♨️',n:'Steam',a:'gas',f:'Steam is a gas. It floats up high and you cannot hold it!'},
-    {e:'🎈',n:'Air in a balloon',a:'gas',f:'The air in a balloon is a gas. It fills the whole balloon!'},
-    {e:'💨',n:'Wind',a:'gas',f:'Wind is moving air. Air is a gas!'},
-    {e:'🫧',n:'Bubbles',a:'gas',f:'Bubbles are full of air. Air is a gas!'}];
+    {e:'🧊',n:['Ice','बर्फ़'],a:'solid',f:['Ice is a solid. It is hard and cold!','बर्फ़ सॉलिड है। यह सख़्त और ठंडी होती है!']},
+    {e:'🪨',n:['Rock','पत्थर'],a:'solid',f:['A rock is a solid. You can hold it in your hand!','पत्थर सॉलिड है। इसे हाथ में पकड़ सकते हैं!']},
+    {e:'🧱',n:['Brick','ईंट'],a:'solid',f:['A brick is a solid. It keeps its shape!','ईंट सॉलिड है। यह अपनी शक्ल नहीं बदलती!']},
+    {e:'⚽',n:['Ball','गेंद'],a:'solid',f:['A ball is a solid. It bounces and rolls!','गेंद सॉलिड है। यह उछलती और लुढ़कती है!']},
+    {e:'💧',n:['Water','पानी'],a:'liquid',f:['Water is a liquid. It splashes and pours!','पानी लिक्विड है। यह बहता है और छप-छप करता है!']},
+    {e:'🥛',n:['Milk','दूध'],a:'liquid',f:['Milk is a liquid. You can pour it in a cup!','दूध लिक्विड है। इसे गिलास में डाल सकते हैं!']},
+    {e:'🍯',n:['Honey','शहद'],a:'liquid',f:['Honey is a liquid. It pours slowly and it is sticky!','शहद लिक्विड है। यह धीरे-धीरे बहता है और चिपचिपा होता है!']},
+    {e:'🧃',n:['Juice','जूस'],a:'liquid',f:['Juice is a liquid. Yum, you can drink it!','जूस लिक्विड है। इसे पी सकते हैं, यम यम!']},
+    {e:'♨️',n:['Steam','भाप'],a:'gas',f:['Steam is a gas. It floats up high and you cannot hold it!','भाप गैस है। यह ऊपर उड़ जाती है, इसे पकड़ नहीं सकते!']},
+    {e:'🎈',n:['Air in a balloon','गुब्बारे की हवा'],a:'gas',f:['The air in a balloon is a gas. It fills the whole balloon!','गुब्बारे की हवा गैस है। यह पूरे गुब्बारे में भर जाती है!']},
+    {e:'💨',n:['Wind','हवा'],a:'gas',f:['Wind is moving air. Air is a gas!','हवा गैस है। हवा चलती है, सूं सूं!']},
+    {e:'🫧',n:['Bubbles','बुलबुले'],a:'gas',f:['Bubbles are full of air. Air is a gas!','बुलबुलों में हवा भरी है। हवा गैस है!']}];
   quiz(root,{items:items,
-    ask:function(it){return it.n+'! Is it a solid, a liquid, or a gas?'},
-    q:function(){return 'Solid, liquid, or gas?'},
-    choices:[{id:'solid',e:'🧱',n:'Solid',hint:'Hard to hold',color:'var(--coral)'},
-             {id:'liquid',e:'💧',n:'Liquid',hint:'Pours and splashes',color:'var(--ocean)'},
-             {id:'gas',e:'☁️',n:'Gas',hint:'Floats in the air',color:'var(--grape)'}],
+    ask:function(it){return H()?tx(it.n)+'! यह सॉलिड है, लिक्विड है, या गैस?':tx(it.n)+'! Is it a solid, a liquid, or a gas?'},
+    q:function(){return H()?'सॉलिड, लिक्विड या गैस?':'Solid, liquid, or gas?'},
+    choices:[{id:'solid',e:'🧱',n:['Solid','सॉलिड'],hint:['Hard to hold','हाथ में पकड़ो'],color:'var(--coral)'},
+             {id:'liquid',e:'💧',n:['Liquid','लिक्विड'],hint:['Pours and splashes','बहता है, छप-छप'],color:'var(--ocean)'},
+             {id:'gas',e:'☁️',n:['Gas','गैस'],hint:['Floats in the air','हवा में उड़ती है'],color:'var(--grape)'}],
     magic:magicStates});
 }};
 
 function magicStates(root){
-  var step=0,st=[{e:'🧊',n:'Solid',say:'This is ice. Ice is a solid.',btn:'🔥 Heat it!',h:15},
-                 {e:'💧',n:'Liquid',say:'The ice melted. Now it is water. Water is a liquid.',btn:'🔥 More heat!',h:55},
-                 {e:'♨️',n:'Gas',say:'Whoosh! The water is steam. Steam is a gas.',btn:'❄️ Freeze it!',h:95}];
+  var step=0,st=[
+    {e:'🧊',n:['Solid','सॉलिड'],say:['This is ice. Ice is a solid.','यह बर्फ़ है। बर्फ़ सॉलिड होती है।'],btn:['🔥 Heat it!','🔥 गरम करो!'],h:15},
+    {e:'💧',n:['Liquid','लिक्विड'],say:['The ice melted. Now it is water. Water is a liquid.','बर्फ़ पिघल गई। अब यह पानी है। पानी लिक्विड है।'],btn:['🔥 More heat!','🔥 और गरम!'],h:55},
+    {e:'♨️',n:['Gas','गैस'],say:['Whoosh! The water became steam. Steam is a gas.','वूश! पानी भाप बन गया। भाप गैस है।'],btn:['❄️ Freeze it!','❄️ जमाओ!'],h:95}];
   var md=el('div','modal'),box=el('div','card'),th=el('div','thermo','<i></i>'),big=el('div','big','');
   var nm=el('div','nm',''),btn=el('button','go','');
   var close=el('button','magic','✖️');close.onclick=function(){sfx.tap();md.remove();replay=null};
@@ -366,9 +394,9 @@ function magicStates(root){
   box.append(big,nm,btn,close);box.appendChild(th);
   md.appendChild(box);root.appendChild(md);
   function draw(first){
-    var s=st[step];big.textContent=s.e;nm.textContent=s.n;btn.textContent=s.btn;th.firstChild.style.height=s.h+'%';
+    var s=st[step];big.textContent=s.e;nm.textContent=tx(s.n);btn.textContent=tx(s.btn);th.firstChild.style.height=s.h+'%';
     if(!first){big.classList.remove('morph');void big.offsetWidth;big.classList.add('morph')}
-    say(s.say);replay=function(){say(s.say)};
+    say(tx(s.say));replay=function(){say(tx(s.say))};
   }
   btn.onclick=function(){
     var prev=step;step=(step+1)%3;
@@ -379,33 +407,40 @@ function magicStates(root){
   draw(true);
 }
 
-ACTS.hotcold={title:'Hot or Cold',run:function(root){
+ACTS.hotcold={title:['Hot or Cold','गरम या ठंडा'],run:function(root){
   var items=[
-    {e:'🔥',n:'Fire',a:'hot',f:'Fire is hot! Never touch it.'},
-    {e:'🍦',n:'Ice cream',a:'cold',f:'Ice cream is cold! Brrr, yummy!'},
-    {e:'🍲',n:'Soup',a:'hot',f:'Soup can be hot! Blow on it first.'},
-    {e:'⛄',n:'Snowman',a:'cold',f:'A snowman is cold. He is made of snow!'},
-    {e:'☀️',n:'Sun',a:'hot',f:'The sun is hot. It keeps us warm!'},
-    {e:'🧊',n:'Ice',a:'cold',f:'Ice is very cold!'},
-    {e:'☕',n:'Hot tea',a:'hot',f:'Tea is hot. Only grown ups drink it!'},
-    {e:'🍧',n:'Ice pop',a:'cold',f:'An ice pop is cold!'},
-    {e:'🍕',n:'Pizza',a:'hot',f:'Fresh pizza is hot from the oven!'},
-    {e:'❄️',n:'Snowflake',a:'cold',f:'A snowflake is cold. It is frozen water!'},
-    {e:'🐧',n:'Penguin',a:'cold',f:'Penguins live where it is very cold!'}];
+    {e:'🔥',n:['Fire','आग'],a:'hot',f:['Fire is hot! Never touch it.','आग गरम होती है! उसे कभी मत छूना।']},
+    {e:'🍦',n:['Ice cream','आइसक्रीम'],a:'cold',f:['Ice cream is cold! Brrr, yummy!','आइसक्रीम ठंडी है! ब्रर्र, यम यम!']},
+    {e:'🍲',n:['Soup','सूप'],a:'hot',f:['Soup can be hot! Blow on it first.','सूप गरम हो सकता है! पहले फूँक मारो।']},
+    {e:'⛄',n:['Snowman','स्नोमैन'],a:'cold',f:['A snowman is cold. He is made of snow!','स्नोमैन ठंडा है। वह बर्फ़ से बना है!']},
+    {e:'☀️',n:['Sun','सूरज'],a:'hot',f:['The sun is hot. It keeps us warm!','सूरज गरम है। वह हमें गरमी देता है!']},
+    {e:'🧊',n:['Ice','बर्फ़'],a:'cold',f:['Ice is very cold!','बर्फ़ बहुत ठंडी होती है!']},
+    {e:'☕',n:['Hot tea','चाय'],a:'hot',f:['Tea is hot. Only grown ups drink it!','चाय गरम होती है। सिर्फ़ बड़े पीते हैं!']},
+    {e:'🍧',n:['Ice pop','बर्फ़ का गोला'],a:'cold',f:['An ice pop is cold!','बर्फ़ का गोला ठंडा होता है!']},
+    {e:'🍕',n:['Pizza','पिज़्ज़ा'],a:'hot',f:['Fresh pizza is hot from the oven!','ताज़ा पिज़्ज़ा गरम होता है!']},
+    {e:'❄️',n:['Snowflake','बर्फ़ का फूल'],a:'cold',f:['A snowflake is cold. It is frozen water!','बर्फ़ का फूल ठंडा होता है। यह जमा हुआ पानी है!']},
+    {e:'🐧',n:['Penguin','पेंगुइन'],a:'cold',f:['Penguins live where it is very cold!','पेंगुइन बहुत ठंडी जगह रहते हैं!']}];
   quiz(root,{items:items,
-    ask:function(it){return it.n+'! Is it hot or cold?'},
-    q:function(){return 'Hot or cold?'},
-    choices:[{id:'hot',e:'🔥',n:'Hot',color:'var(--coral)'},{id:'cold',e:'❄️',n:'Cold',color:'var(--ocean)'}]});
+    ask:function(it){return H()?tx(it.n)+'! यह गरम है या ठंडा?':tx(it.n)+'! Is it hot or cold?'},
+    q:function(){return H()?'गरम या ठंडा?':'Hot or cold?'},
+    choices:[{id:'hot',e:'🔥',n:['Hot','गरम'],color:'var(--coral)'},{id:'cold',e:'❄️',n:['Cold','ठंडा'],color:'var(--ocean)'}]});
 }};
 
-ACTS.floatsink={title:'Float or Sink',run:function(root){
+ACTS.floatsink={title:['Float or Sink','तैरे या डूबे'],run:function(root){
   var pool=[
-    {e:'🦆',n:'duck',f:true},{e:'🪵',n:'log',f:true},{e:'🍎',n:'apple',f:true},{e:'🏀',n:'ball',f:true},{e:'⛵',n:'boat',f:true},{e:'🍃',n:'leaf',f:true},
-    {e:'🪨',n:'rock',f:false},{e:'🪙',n:'coin',f:false},{e:'🔑',n:'key',f:false},{e:'⚓',n:'anchor',f:false},{e:'🔔',n:'bell',f:false}];
-  var wrap=el('div','fs'),shelf=el('div','shelf'),tub=el('div','tub'),water=el('div','water'),hint=el('div','hintbar','Drop things in the water!');
+    {e:'🦆',n:['duck','बत्तख'],f:true,g:'f'},{e:'🪵',n:['log','लकड़ी'],f:true,g:'f'},{e:'🍎',n:['apple','सेब'],f:true,g:'m'},
+    {e:'🏀',n:['ball','गेंद'],f:true,g:'f'},{e:'⛵',n:['boat','नाव'],f:true,g:'f'},{e:'🍃',n:['leaf','पत्ता'],f:true,g:'m'},
+    {e:'🪨',n:['rock','पत्थर'],f:false,g:'m'},{e:'🪙',n:['coin','सिक्का'],f:false,g:'m'},{e:'🔑',n:['key','चाबी'],f:false,g:'f'},
+    {e:'⚓',n:['anchor','लंगर'],f:false,g:'m'},{e:'🔔',n:['bell','घंटी'],f:false,g:'f'}];
+  function result(it){
+    if(!H())return 'The '+it.n[0]+(it.f?' floats!':' sinks!');
+    var v=it.f?(it.g==='f'?'तैरती':'तैरता'):(it.g==='f'?'डूबती':'डूबता');
+    return it.n[1]+' '+v+' है!';
+  }
+  var wrap=el('div','fs'),shelf=el('div','shelf'),tub=el('div','tub'),water=el('div','water'),hint=el('div','hintbar',tx(['Drop things in the water!','पानी में डालो!']));
   tub.append(hint,water);wrap.append(shelf,tub);root.appendChild(wrap);
   var left=0,set=shuffle(pool).slice(0,8);
-  var intro='Will it float or sink? Touch something and put it in the water!';
+  var intro=tx(['Will it float or sink? Touch something and put it in the water!','क्या यह तैरेगा या डूबेगा? किसी चीज़ को छुओ और पानी में डालो!']);
   say(intro);replay=function(){say(intro)};
   set.forEach(function(it){
     left++;
@@ -427,50 +462,55 @@ ACTS.floatsink={title:'Float or Sink',run:function(root){
     b.style.transform='';tub.appendChild(b);b.classList.add('in');
     b.style.left=(ir.left-tr.left)+'px';b.style.top=(ir.top-tr.top)+'px';
     void b.offsetWidth;
-    var tx=x==null?rnd(tr.width*.1,tr.width*.8):Math.max(4,Math.min(tr.width-size*1.2,x-size*.6));
+    var tx2=x==null?rnd(tr.width*.1,tr.width*.8):Math.max(4,Math.min(tr.width-size*1.2,x-size*.6));
     var waterTop=tr.height*.38;
-    b.style.left=tx+'px';
+    b.style.left=tx2+'px';
     setTimeout(function(){
       sfx.splash();hint.style.display='none';
-      if(it.f){b.classList.add('swim');b.style.top=(waterTop-size*.55)+'px';say('The '+it.n+' floats!')}
-      else{b.classList.add('sink');b.style.top=(tr.height-size*1.25-rnd(0,10))+'px';say('The '+it.n+' sinks!')}
-      replay=function(){say('The '+it.n+(it.f?' floats!':' sinks!'))};
+      if(it.f){b.classList.add('swim');b.style.top=(waterTop-size*.55)+'px'}
+      else{b.classList.add('sink');b.style.top=(tr.height-size*1.25-rnd(0,10))+'px'}
+      say(result(it));replay=function(){say(result(it))};
       left--;
       if(left===0)setTimeout(finish,2400);
     },450);
   }
   function finish(){
     if(!wrap.isConnected)return;
-    celebrate();say('Hooray! Great job! Some things float, and some things sink!');
-    var d=el('div','modal'),c=el('div','card answer','<span class="em">🎉</span><p>Some things float. Some things sink!</p>');
+    celebrate();
+    var msg=tx(['Hooray! Great job! Some things float, and some things sink!','शाबाश! कुछ चीज़ें तैरती हैं, और कुछ डूब जाती हैं!']);
+    say(msg);
+    var d=el('div','modal'),c=el('div','card answer','<span class="em">🎉</span><p>'+msg+'</p>');
     var nx=el('button','next','🔄');nx.setAttribute('aria-label','Play again');
     nx.onclick=function(){sfx.tap();root.innerHTML='';ACTS.floatsink.run(root)};
     c.appendChild(nx);d.appendChild(c);wrap.style.position='relative';tub.appendChild(d);d.style.zIndex=20;
   }
 }};
 
-ACTS.colors={title:'Mix Colors',run:function(root){
-  var C={red:{c:'#ff3b3b',n:'Red'},yellow:{c:'#ffd400',n:'Yellow'},blue:{c:'#2b6cff',n:'Blue'}};
-  var R={'red+yellow':['Orange','#ff8a1f'],'blue+yellow':['Green','#2fbf4a'],'blue+red':['Purple','#8b3fd6']};
+ACTS.colors={title:['Mix Colors','रंग मिलाओ'],run:function(root){
+  var C={red:{c:'#ff3b3b',n:['Red','लाल']},yellow:{c:'#ffd400',n:['Yellow','पीला']},blue:{c:'#2b6cff',n:['Blue','नीला']}};
+  var R={'red+yellow':[['Orange','नारंगी'],'#ff8a1f'],'blue+yellow':[['Green','हरा'],'#2fbf4a'],'blue+red':[['Purple','बैंगनी'],'#8b3fd6']};
   var box=el('div','mix'),bowl=el('div','bowl'),blob=el('div','blob'),pots=el('div','pots');
   blob.style.background='transparent';bowl.appendChild(blob);box.append(bowl,pots);root.appendChild(box);
   var first=null,busy=false;
-  var intro='Pick two colors to mix! Touch a paint pot.';
+  var intro=tx(['Pick two colors to mix! Touch a paint pot.','दो रंग चुनो और मिलाओ! रंग के डिब्बे को छुओ।']);
   say(intro);replay=function(){say(intro)};
   Object.keys(C).forEach(function(k){
-    var p=el('button','pot');p.style.background=C[k].c;p.setAttribute('aria-label',C[k].n);
+    var p=el('button','pot');p.style.background=C[k].c;p.setAttribute('aria-label',C[k].n[0]);
     p.onclick=function(){
       if(busy)return;
       p.classList.remove('drip');void p.offsetWidth;p.classList.add('drip');sfx.pour();
-      if(!first){first=k;blob.style.background=C[k].c;blob.style.transform='scale(.7)';setTimeout(function(){blob.style.transform='scale(1)'},30);say(C[k].n+'! Now pick another color.')}
-      else if(first===k){say('That is still '+C[k].n+'! Pick a different color.')}
+      var nk=tx(C[k].n);
+      if(!first){first=k;blob.style.background=C[k].c;blob.style.transform='scale(.7)';setTimeout(function(){blob.style.transform='scale(1)'},30);
+        say(H()?nk+'! अब दूसरा रंग चुनो।':nk+'! Now pick another color.')}
+      else if(first===k){say(H()?'यह तो अभी भी '+nk+' है! दूसरा रंग चुनो।':'That is still '+nk+'! Pick a different color.')}
       else{
-        busy=true;var key=[first,k].sort().join('+'),res=R[key],a=C[first].c,b=C[k].c;
+        busy=true;var key=[first,k].sort().join('+'),res=R[key],a=C[first].c,b=C[k].c,n1=tx(C[first].n);
         blob.style.setProperty('--a',a);blob.style.setProperty('--b',b);blob.classList.add('swirl');
-        say(C[first].n+' and '+C[k].n+'...');
+        say(n1+(H()?' और ':' and ')+nk+'...');
         setTimeout(function(){
           blob.classList.remove('swirl');blob.style.background=res[1];
-          var t='Wow! '+C[first].n+' and '+C[k].n+' make '+res[0]+'!';say(t);replay=function(){say(t)};celebrate(bowl);
+          var t=H()?'वाह! '+n1+' और '+nk+' मिलकर '+tx(res[0])+' बनते हैं!':'Wow! '+n1+' and '+nk+' make '+tx(res[0])+'!';
+          say(t);replay=function(){say(t)};celebrate(bowl);
           first=null;busy=false;
         },1200);
       }
@@ -479,43 +519,46 @@ ACTS.colors={title:'Mix Colors',run:function(root){
   bowl.onclick=function(){if(busy)return;sfx.tap();first=null;blob.style.background='transparent';say(intro);replay=function(){say(intro)}};
 }};
 
-ACTS.daynight={title:'Day and Night',run:function(root){
+ACTS.daynight={title:['Day and Night','दिन और रात'],run:function(root){
   var sc=el('div','scene'),night=false;
   var stars='';for(var i=0;i<14;i++)stars+='<span style="left:'+rnd(3,92).toFixed(1)+'%;top:'+rnd(2,80).toFixed(1)+'%;animation-delay:'+rnd(0,2).toFixed(1)+'s">⭐</span>';
   sc.innerHTML='<div class="sky d"></div><div class="sky n"></div><div class="starl">'+stars+'</div>'+
     '<div class="orb sunb">☀️</div><div class="orb moonb">🌙</div><div class="hill"></div><div class="hill h2"></div>'+
     '<div class="crit day">🐦</div><div class="crit nite">🦉</div>';
-  var tg=el('button','togl','🌙 Night');sc.appendChild(tg);root.appendChild(sc);
-  function msg(){return night?'It is night. The moon and the stars come out. The owl says hoot!':'It is day. The sun is up. The bird says tweet!'}
-  function flip(){night=!night;sc.classList.toggle('night',night);tg.textContent=night?'☀️ Day':'🌙 Night';sfx.whoosh();
+  var tg=el('button','togl',tx(['🌙 Night','🌙 रात']));sc.appendChild(tg);root.appendChild(sc);
+  function msg(){return night?tx(['It is night. The moon and the stars come out. The owl says hoot!','अब रात है। चाँद और तारे निकल आए। उल्लू बोला, हू हू!']):tx(['It is day. The sun is up. The bird says tweet!','अब दिन है। सूरज निकल आया। चिड़िया बोली, चीं चीं!'])}
+  function flip(){night=!night;sc.classList.toggle('night',night);tg.textContent=night?tx(['☀️ Day','☀️ दिन']):tx(['🌙 Night','🌙 रात']);sfx.whoosh();
     setTimeout(function(){say(msg());night?sfx.hoot():sfx.chirp()},700)}
   tg.onclick=flip;
   sc.querySelectorAll('.orb').forEach(function(o){o.onclick=flip});
   sc.querySelectorAll('.crit').forEach(function(c){c.onclick=function(){c.classList.remove('hop');void c.offsetWidth;c.classList.add('hop');
-    if(c.classList.contains('day')){sfx.chirp();say('Tweet tweet! Birds sing in the day!')}else{sfx.hoot();say('Hoot hoot! Owls wake up at night!')}}});
-  var intro='Touch the sun or the moon to change the sky!';
+    if(c.classList.contains('day')){sfx.chirp();say(tx(['Tweet tweet! Birds sing in the day!','चीं चीं! चिड़िया दिन में गाती है!']))}
+    else{sfx.hoot();say(tx(['Hoot hoot! Owls wake up at night!','हू हू! उल्लू रात को जागता है!']))}}});
+  var intro=tx(['Touch the sun or the moon to change the sky!','सूरज या चाँद को छुओ, आसमान बदल जाएगा!']);
   say(intro);replay=function(){say(msg())};
 }};
 
-ACTS.weather={title:'Weather',run:function(root){
+ACTS.weather={title:['Weather','मौसम'],run:function(root){
   var sc=el('div','scene wx m-sunny'),cv=el('canvas');
   sc.innerHTML='<div class="wsun">☀️</div><div class="cl" style="top:4%;left:6%">☁️</div><div class="cl" style="top:12%;right:8%;animation-delay:-4s">☁️</div><div class="cl" style="top:2%;left:42%;animation-delay:-8s">☁️</div>';
   sc.appendChild(cv);
-  var M=[['sunny','☀️','It is sunny! The sun is bright and warm.'],['rainy','🌧️','It is raining! Rain falls from the clouds.'],
-         ['snowy','❄️','It is snowing! Snow is frozen water. Brrr!'],['windy','💨','It is windy! The wind blows the leaves.']];
+  var M=[['sunny','☀️',['It is sunny! The sun is bright and warm.','धूप निकली है! सूरज चमक रहा है।']],
+         ['rainy','🌧️',['It is raining! Rain falls from the clouds.','बारिश हो रही है! बादलों से पानी गिरता है, टप टप!']],
+         ['snowy','❄️',['It is snowing! Snow is frozen water. Brrr!','बर्फ़ गिर रही है! बर्फ़ जमा हुआ पानी है। ब्रर्र!']],
+         ['windy','💨',['It is windy! The wind blows the leaves.','हवा चल रही है! हवा पत्तों को उड़ाती है, सूं सूं!']]];
   var bar=el('div','wbtns'),mode='sunny',btns={};
   M.forEach(function(m){var b=el('button','wb'+(m[0]==='sunny'?' on':''),m[1]);b.setAttribute('aria-label',m[0]);b.onclick=function(){set(m[0],true)};btns[m[0]]=b;bar.appendChild(b)});
   sc.appendChild(bar);root.appendChild(sc);
-  var ctx=cv.getContext('2d'),W=0,H=0,dpr=1,parts=[],raf=0,stopAmb=function(){},timer=0;
-  function resize(){var r=cv.getBoundingClientRect();dpr=Math.min(2,window.devicePixelRatio||1);cv.width=r.width*dpr;cv.height=r.height*dpr;W=r.width;H=r.height;seed()}
-  function seed(){var n={rainy:130,snowy:70,windy:16}[mode]||0;parts=[];for(var i=0;i<n;i++)parts.push({x:Math.random()*W,y:Math.random()*H,s:rnd(.6,1.3),p:Math.random()*6})}
+  var ctx=cv.getContext('2d'),W=0,H2=0,dpr=1,parts=[],raf=0,stopAmb=function(){},timer=0;
+  function resize(){var r=cv.getBoundingClientRect();dpr=Math.min(2,window.devicePixelRatio||1);cv.width=r.width*dpr;cv.height=r.height*dpr;W=r.width;H2=r.height;seed()}
+  function seed(){var n={rainy:130,snowy:70,windy:16}[mode]||0;parts=[];for(var i=0;i<n;i++)parts.push({x:Math.random()*W,y:Math.random()*H2,s:rnd(.6,1.3),p:Math.random()*6})}
   var t=0;
   function frame(){
-    raf=requestAnimationFrame(frame);t+=.03;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+    raf=requestAnimationFrame(frame);t+=.03;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H2);
     parts.forEach(function(p){
-      if(mode==='rainy'){ctx.strokeStyle='rgba(200,230,255,.85)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-4,p.y+16*p.s);ctx.stroke();p.y+=15*p.s;p.x-=1.5;if(p.y>H){p.y=-20;p.x=Math.random()*W}}
-      else if(mode==='snowy'){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x,p.y,3+p.s*3,0,6.283);ctx.fill();p.y+=1.6*p.s;p.x+=Math.sin(t+p.p)*.7;if(p.y>H){p.y=-10;p.x=Math.random()*W}}
-      else if(mode==='windy'){ctx.font='34px serif';ctx.fillText('🍃',p.x,p.y);ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x-70,p.y+10);ctx.lineTo(p.x-14,p.y+10);ctx.stroke();p.x+=11*p.s;p.y+=Math.sin(t*2+p.p)*1.5;if(p.x>W+40){p.x=-90;p.y=Math.random()*H}}
+      if(mode==='rainy'){ctx.strokeStyle='rgba(200,230,255,.85)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-4,p.y+16*p.s);ctx.stroke();p.y+=15*p.s;p.x-=1.5;if(p.y>H2){p.y=-20;p.x=Math.random()*W}}
+      else if(mode==='snowy'){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x,p.y,3+p.s*3,0,6.283);ctx.fill();p.y+=1.6*p.s;p.x+=Math.sin(t+p.p)*.7;if(p.y>H2){p.y=-10;p.x=Math.random()*W}}
+      else if(mode==='windy'){ctx.font='34px serif';ctx.fillText('🍃',p.x,p.y);ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x-70,p.y+10);ctx.lineTo(p.x-14,p.y+10);ctx.stroke();p.x+=11*p.s;p.y+=Math.sin(t*2+p.p)*1.5;if(p.x>W+40){p.x=-90;p.y=Math.random()*H2}}
     });
   }
   function set(m,speak){
@@ -524,11 +567,11 @@ ACTS.weather={title:'Weather',run:function(root){
     if(m==='rainy')stopAmb=ambient('rain');else if(m==='windy')stopAmb=ambient('wind');else stopAmb=function(){};
     if(m==='sunny')timer=setInterval(sfx.chirp,2500);
     if(m==='snowy')timer=setInterval(function(){tone(1200+Math.random()*600,.5,'sine',.06,0,900)},900);
-    if(speak){var s=M.filter(function(x){return x[0]===m})[0][2];say(s);replay=function(){say(s)}}
+    if(speak){var s=tx(M.filter(function(x){return x[0]===m})[0][2]);say(s);replay=function(){say(s)}}
   }
   resize();window.addEventListener('resize',resize);frame();
   onLeave(function(){cancelAnimationFrame(raf);window.removeEventListener('resize',resize);stopAmb();clearInterval(timer)});
-  set('sunny',false);var intro='Touch a picture to change the weather!';say(intro);replay=function(){say(intro)};
+  set('sunny',false);var intro=tx(['Touch a picture to change the weather!','तस्वीर को छुओ, मौसम बदल जाएगा!']);say(intro);replay=function(){say(intro)};
 }};
 
 showStars();
